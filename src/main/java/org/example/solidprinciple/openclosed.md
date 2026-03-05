@@ -97,3 +97,89 @@ For Medior engineers, don't apply OCP blindly. Follow the Rule of Three:
 - Is it closed? Can I add a feature without touching this file?
 - Is it abstract? Does the high-level service depend on an Interface rather than a Concrete Class?
 - Does it use DI? Are we injecting a list of behaviors instead of hardcoding them?
+
+
+---
+
+```markdown
+# 🛠️ Implementation Patterns for Open/Closed Principle (OCP)
+
+In Spring Boot, we typically use **Dependency Injection** to satisfy OCP. This allows us to add new functionality (Extensions) without modifying the core service (Closed).
+
+There are two primary ways to manage these extensions:
+
+## 1. The Map Pattern (The "Fast" Choice)
+Spring can inject all beans of a specific interface into a `Map<String, Interface>`. The **key** of the map corresponds to the **Bean Name**.
+
+### When to use:
+* Simple 1:1 mapping (e.g., File extensions: "PDF", "CSV").
+* You need $O(1)$ performance for high-throughput lookups.
+
+```java
+@Service
+public class ExportService {
+    // Key = bean name (e.g., "pdfExporter"), Value = the bean instance
+    private final Map<String, Exporter> exporters;
+
+    public ExportService(Map<String, Exporter> exporters) {
+        this.exporters = exporters;
+    }
+
+    public void exportData(String type, Data data) {
+        Exporter exporter = exporters.get(type + "Exporter");
+        if (exporter == null) throw new IllegalArgumentException("Type not supported");
+        exporter.export(data);
+    }
+}
+
+```
+
+---
+
+## 2. The Support Pattern (The "Flexible" Choice)
+
+The service iterates through a `List` of implementations and asks each bean if it is capable of handling the current request.
+
+### When to use:
+
+* Complex business rules (e.g., "If amount > 1000 AND currency is USD").
+* The logic to choose a handler involves more than just a simple String key.
+
+```java
+@Service
+public class PaymentService {
+    private final List<PaymentProcessor> processors;
+
+    public PaymentService(List<PaymentProcessor> processors) {
+        this.processors = processors;
+    }
+
+    public void process(PaymentRequest request) {
+        processors.stream()
+            .filter(p -> p.supports(request)) // Logic lives inside each implementation
+            .findFirst()
+            .orElseThrow(() -> new RuntimeException("No processor found"))
+            .pay(request.getAmount());
+    }
+}
+
+```
+
+---
+
+## 📋 Comparison Table
+
+| Feature | Map Pattern | Support (List) Pattern |
+| --- | --- | --- |
+| **Selection Logic** | Centralized (Key-based) | Decentralized (Each class decides) |
+| **Performance** | Faster ($O(1)$) | Slower ($O(n)$) |
+| **Flexibility** | Low (Static keys only) | High (Dynamic logic) |
+| **Spring Setup** | Uses `@Component("name")` | Uses generic `@Component` |
+
+---
+
+### ⚠️ Medior Tip: The "Rule of Three"
+
+Do not create these patterns for a single `if/else`. Only refactor to these patterns if you anticipate having 3 or more implementations, or if the logic is expected to grow across different sprints.
+
+```

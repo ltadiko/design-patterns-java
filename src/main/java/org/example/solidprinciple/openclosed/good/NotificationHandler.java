@@ -1,4 +1,8 @@
 package org.example.solidprinciple.openclosed.good;
 
-public class NotificationHandler {
+// STEP 1: Define the interface
+public interface NotificationHandler {
+    boolean supports(String type);
+
+    void send(String message);
 }
